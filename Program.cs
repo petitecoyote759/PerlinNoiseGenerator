@@ -208,21 +208,25 @@ namespace ShortTools.Perlin
 
         private static Tuple<byte, byte, byte> GetColours(float value)
         {
-            if (value < -0.4f)
+            if (value < 0f) // from -1 to 0 so just add one ig
             {
-                return new Tuple<byte, byte, byte>(20, 80, 200);
-            }
-            else if (value < 0f)
-            {
-                return new Tuple<byte, byte, byte>(40, 150, 250);
+                return new Tuple<byte, byte, byte>(
+                    (byte)(10 + (20 * (value + 1))),
+                    (byte)(60 + (40 * (value + 1))),
+                    (byte)(50 + (200 * (value + 1)))
+                    );
             }
             else if (value < 0.1f)
             {
                 return new Tuple<byte, byte, byte>(200, 200, 20);
             }
             else
-            {
-                return new Tuple<byte, byte, byte>(20, 200, 30);
+            { // 0.1 to 1, thats 0.9 which is basically 0 - 1
+                return new Tuple<byte, byte, byte>(
+                    (byte)(10 + value * 10), 
+                    (byte)(150 + value * 50),
+                    (byte)(10 + value * 20)
+                    );
             }
         }
     }
