@@ -52,7 +52,7 @@ namespace ShortTools.Perlin
 
             float value = Lerp(North, South, ((y - Squarey * gridSize) / (float)gridSize)); // will be between - gridsize / 2 and gridsize / 2
             // to be between -1 and 1, it should do this
-            return float.Clamp((value * 2f / gridSize) * scale, -1, 1);
+            return float.Clamp((value * 1.414f / gridSize) * scale, -1, 1);
         }
 
 
