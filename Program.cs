@@ -171,7 +171,7 @@ namespace ShortTools.Perlin
 
 
 
-
+        const bool coloured = true;
         private static void Render()
         {
             
@@ -184,10 +184,45 @@ namespace ShortTools.Perlin
             {
                 for (int y = 0; y < PerlinMap.GetLength(1); y++)
                 {
-                    byte colour = (byte)((PerlinMap[x, y] + 1) * 255 / 2);
+                    byte r;
+                    byte g;
+                    byte b;
 
-                    renderer.SetPixel(x * scale, y * scale, scale, scale, colour, colour, colour);
+                    if (coloured)
+                    {
+                        Tuple<byte, byte, byte> colours = GetColours(PerlinMap[x, y]);
+                        r = colours.Item1; g = colours.Item2; b = colours.Item3;
+                    }
+                    else
+                    {
+                        byte colour = (byte)((PerlinMap[x, y] + 1) * 255 / 2);
+                        r = colour; g = colour; b = colour;
+                    }
+
+                    renderer.SetPixel(x * scale, y * scale, scale, scale, r, g, b);
                 }
+            }
+        }
+
+
+
+        private static Tuple<byte, byte, byte> GetColours(float value)
+        {
+            if (value < -0.4f)
+            {
+                return new Tuple<byte, byte, byte>(20, 80, 200);
+            }
+            else if (value < 0f)
+            {
+                return new Tuple<byte, byte, byte>(40, 150, 250);
+            }
+            else if (value < 0.1f)
+            {
+                return new Tuple<byte, byte, byte>(200, 200, 20);
+            }
+            else
+            {
+                return new Tuple<byte, byte, byte>(20, 200, 30);
             }
         }
     }
