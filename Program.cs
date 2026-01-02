@@ -66,19 +66,19 @@ namespace ShortTools.Perlin
 
         private static Vector2[,] GenVectorField(int width, int height)
         {
-            Vector2[,] vectorField = new Vector2[width, height];
+            Vector2[,] field = new Vector2[width, height];
             Random random = new Random();
 
             for (int x = 0; x < width; x++)
             {
                 for (int y = 0; y < height; y++)
                 {
-                    //                              could optimise to use set numbers but we will see
-                    vectorField[x, y] = new Vector2((float)random.NextDouble() * 2f - 1f, (float)random.NextDouble() * 2f - 1f);
+                    float angle = (float)(random.NextDouble() * Math.PI * 2);
+                    field[x, y] = new Vector2(MathF.Cos(angle), MathF.Sin(angle));
                 }
             }
 
-            return vectorField;
+            return field;
         }
 
 
@@ -115,7 +115,7 @@ namespace ShortTools.Perlin
     {
         static GraphicsHandler renderer;
         static float[,]? PerlinMap = null;
-        const int scale = 8;
+        const int scale = 2;
 
 
         private static void Main()
@@ -129,10 +129,15 @@ namespace ShortTools.Perlin
 
                 renderer.Pause();
 
+                float[,] continentMap = Perlin.GeneratePerlinMap(renderer.screenwidth / scale, renderer.screenheight / scale, 64, 4f);
                 float[,] firstMap = Perlin.GeneratePerlinMap(renderer.screenwidth / scale, renderer.screenheight / scale, 16);
                 float[,] secondMap = Perlin.GeneratePerlinMap(renderer.screenwidth / scale, renderer.screenheight / scale, 8, 0.25f);
 
                 PerlinMap = Perlin.CombineFloatMaps(firstMap, secondMap, 1.25f);
+                PerlinMap = Perlin.CombineFloatMaps(continentMap, PerlinMap, 5f);
+
+                PerlinMap = ApplyFuncToMap(PerlinMap);
+
                 renderer.Resume();
                 
                 Console.WriteLine("Perlin Map Loaded");
@@ -142,6 +147,27 @@ namespace ShortTools.Perlin
                 Console.WriteLine("Terminating");
             }
         }
+
+
+
+        private static float[,] ApplyFuncToMap(float[,] map)
+        {
+            int width = map.GetLength(0);
+            int height = map.GetLength(1);
+
+            float[,] outMap = new float[width, height];
+
+            for (int x = 0; x < width; x++)
+            {
+                for (int y = 0; y < height; y++)
+                {
+                    outMap[x, y] = MathF.Tanh(4 * map[x, y]);
+                }
+            }
+
+            return outMap;
+        }
+
 
 
 
