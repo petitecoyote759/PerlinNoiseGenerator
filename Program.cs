@@ -115,7 +115,7 @@ namespace ShortTools.Perlin
     {
         static GraphicsHandler renderer;
         static float[,]? PerlinMap = null;
-        const int scale = 2;
+        const int scale = 1;
 
 
         private static void Main()
@@ -129,14 +129,7 @@ namespace ShortTools.Perlin
 
                 renderer.Pause();
 
-                float[,] continentMap = Perlin.GeneratePerlinMap(renderer.screenwidth / scale, renderer.screenheight / scale, 64, 4f);
-                float[,] firstMap = Perlin.GeneratePerlinMap(renderer.screenwidth / scale, renderer.screenheight / scale, 16);
-                float[,] secondMap = Perlin.GeneratePerlinMap(renderer.screenwidth / scale, renderer.screenheight / scale, 8, 0.25f);
-
-                PerlinMap = Perlin.CombineFloatMaps(firstMap, secondMap, 1.25f);
-                PerlinMap = Perlin.CombineFloatMaps(continentMap, PerlinMap, 5f);
-
-                PerlinMap = ApplyFuncToMap(PerlinMap);
+                tempCreateMap(renderer.screenwidth, renderer.screenheight);
 
                 renderer.Resume();
                 
@@ -147,6 +140,22 @@ namespace ShortTools.Perlin
                 Console.WriteLine("Terminating");
             }
         }
+
+        static void tempCreateMap(int width, int height)
+        {
+            float[,] continentMap = Perlin.GeneratePerlinMap(width / scale, height / scale, 64, 4f);
+            float[,] firstMap = Perlin.GeneratePerlinMap(width / scale, height / scale, 16);
+            float[,] secondMap = Perlin.GeneratePerlinMap(width / scale, height / scale, 8, 0.25f);
+
+            PerlinMap = Perlin.CombineFloatMaps(firstMap, secondMap, 1.25f);
+            PerlinMap = Perlin.CombineFloatMaps(continentMap, PerlinMap, 5f);
+
+            PerlinMap = ApplyFuncToMap(PerlinMap);
+
+            PerlinMap = CreateIsland(PerlinMap);
+        }
+
+
 
 
 
@@ -174,8 +183,6 @@ namespace ShortTools.Perlin
         const bool coloured = true;
         private static void Render()
         {
-            
-
             if (PerlinMap is null) { return; }
 
             // perlin map goes from -1 to 1, so to turn to black and white we can do
@@ -195,10 +202,12 @@ namespace ShortTools.Perlin
                     }
                     else
                     {
-                        byte colour = (byte)((PerlinMap[x, y] + 1) * 255 / 2);
-                        r = colour; g = colour; b = colour;
+                        float value = float.Clamp((PerlinMap[x, y] + 1) * 255 / 2, 0, 255);
+                        byte colour = (byte)(value);
+                        r = g = b = colour;
                     }
 
+                    
                     renderer.SetPixel(x * scale, y * scale, scale, scale, r, g, b);
                 }
             }
@@ -228,6 +237,39 @@ namespace ShortTools.Perlin
                     (byte)(10 + value * 20)
                     );
             }
+        }
+
+
+
+        const float islandWidth = 40f;
+        private static float[,] CreateIsland(float[,] map)
+        {
+            int width = map.GetLength(0);
+            int height = map.GetLength(1);
+
+            float[,] outMap = new float[width, map.GetLength(1)];   
+            for (int x = 0; x < width; x++)
+            {
+                for (int y = 0; y < height; y++)
+                {
+                    float altitude = GetIslandHeight(width / 2, height / 2, x, y, islandWidth);
+                    if (altitude > 0)
+                    {
+                        outMap[x, y] = float.Clamp(map[x, y] + altitude, -1, 1);
+                    }
+                    else
+                    {
+                        outMap[x, y] = map[x, y];
+                    }
+                }
+            }
+
+            return outMap;
+        }
+
+        private static float GetIslandHeight(int cx, int cy, int x, int y, float islandWidth = 20f)
+        {
+            return MathF.Tanh(4 * (MathF.Exp(-((MathF.Pow(x - cx, 2)) + (MathF.Pow(y - cy, 2))) / (islandWidth * islandWidth)) - 0.5f));
         }
     }
 }
