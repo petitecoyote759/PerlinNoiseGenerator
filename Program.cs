@@ -118,6 +118,7 @@ namespace ShortTools.Perlin
         static float[,]? treeMap = null;
         static List<ResourceMap> resourceMaps = new List<ResourceMap>();
 
+
         internal struct ResourceMap
         {
             public string name;
@@ -132,13 +133,14 @@ namespace ShortTools.Perlin
         }
 
 
-        const int scale = 2;
+        const int scale = 4;
         static Tuple<int, int> centre = new Tuple<int, int>(0,0);
-        const bool askForSeed = true;
+        const bool askForSeed = false;
 
         private static void Main()
         {
             int seed;
+            if (!askForSeed) { seed = new Random().Next(int.MinValue, int.MaxValue); }
             while (askForSeed)
             {
                 Console.WriteLine($"Autogen seed? [Y/N]");
@@ -173,18 +175,22 @@ namespace ShortTools.Perlin
 
 
 
+            const bool fullScreen = true;
 
-
-            using (renderer = new GraphicsHandler(
+            using (renderer = new GraphicsHandler(1920, 1080,
                 render: Render,
-                flags: [RendererFlag.OutputToTerminal, RendererFlag.HalfSizedWindow]))
+                flags: RendererFlag.OutputToTerminal))
             {
                 Console.WriteLine("Starting Perlin Demo");
                 Console.WriteLine($"Dimensions = {renderer.screenwidth}x{renderer.screenheight}");
 
                 renderer.Pause();
 
-                centre = new Tuple<int, int>(renderer.screenwidth / 2, renderer.screenheight / 2);
+                centre = new Tuple<int, int>(renderer.screenwidth / (2 * scale), renderer.screenheight / (2 * scale));
+                buildings.Add(new Vector2(centre.Item1, centre.Item2));
+                buildings.Add(new Vector2(centre.Item1 + 30, centre.Item2 - 10));
+                buildings.Add(new Vector2(centre.Item1 - 20, centre.Item2 - 15));
+
                 treeMap = Perlin.GeneratePerlinMap(renderer.screenwidth / scale, renderer.screenheight / scale, 8, random: random);
                 resourceMaps.Add(
                     new ResourceMap("Glucryte", Perlin.GeneratePerlinMap(renderer.screenwidth / scale, renderer.screenheight / scale, 4, random: random), 
@@ -202,11 +208,25 @@ namespace ShortTools.Perlin
                 
                 Console.WriteLine("Perlin Map Loaded");
 
-                Thread.Sleep(10000);
+                TextControl();
 
                 Console.WriteLine("Terminating");
             }
         }
+
+
+        static void TextControl()
+        {
+            Console.WriteLine("Type Q to quit, Switch to switch modes, or Colour to toggle colour");
+            string inp = "";
+            while (inp != "Q")
+            {
+                inp = (Console.ReadLine() ?? "").ToUpperInvariant();
+                if (inp == "SWITCH") { abyssMode = !abyssMode; }
+                if (inp == "COLOUR") { coloured = !coloured; }
+            }
+        }
+
 
         static void tempCreateMap(int width, int height, Random random)
         {
@@ -246,8 +266,10 @@ namespace ShortTools.Perlin
 
 
 
-
-        const bool coloured = true;
+        static List<Vector2> buildings = new List<Vector2>();
+        static bool coloured = true;
+        static bool abyssMode = true;
+        const float buildingCleanseRange = 20f;
         private static void Render()
         {
             if (perlinMap is null) { return; }
@@ -258,20 +280,43 @@ namespace ShortTools.Perlin
             {
                 for (int y = 0; y < perlinMap.GetLength(1); y++)
                 {
-                    byte r;
-                    byte g;
-                    byte b;
+                    byte r = 0;
+                    byte g = 0;
+                    byte b = 0;
 
-                    if (coloured)
+                    if (!abyssMode && coloured)
                     {
+                        // Normal
                         Tuple<byte, byte, byte> colours = GetColours(x, y, perlinMap);
                         r = colours.Item1; g = colours.Item2; b = colours.Item3;
                     }
-                    else
+                    else if (!coloured)
                     {
+                        // Black and White
                         float value = float.Clamp((perlinMap[x, y] + 1) * 255 / 2, 0, 255);
                         byte colour = (byte)(value);
                         r = g = b = colour;
+                    }
+                    else if (abyssMode && coloured)
+                    {
+                        Tuple<byte, byte, byte> colours;
+                        bool cleansed = false;
+                        // Abyss
+                        foreach (Vector2 building in buildings)
+                        {
+                            if (MathF.Pow(x - building.X, 2) + MathF.Pow(y - building.Y, 2) < buildingCleanseRange * buildingCleanseRange)
+                            {
+                                colours = GetColours(x, y, perlinMap);
+                                r = colours.Item1; g = colours.Item2; b = colours.Item3;
+                                cleansed = true;
+                                break;
+                            }
+                        }
+                        if (!cleansed)
+                        {
+                            colours = GetAbyssColours(x, y, perlinMap);
+                            r = colours.Item1; g = colours.Item2; b = colours.Item3;
+                        }
                     }
 
                     
@@ -282,27 +327,38 @@ namespace ShortTools.Perlin
 
 
 
-        private static Tuple<byte, byte, byte> GetColours(int x, int y, float[,] PerlinMap)
+        private static Tuple<byte, byte, byte> GetColours(int x, int y, float[,] perlinMap)
         {
-            float value = PerlinMap[x, y];
+            float value = perlinMap[x, y];
+            //if (GetTileGradient(x, y, perlinMap) > 0.2f) { return new Tuple<byte, byte, byte>(255, 255, 255); }
+
 
             if (
-                (value > 0 && GetTileGradient(x, y, PerlinMap) > 0.27f) ||
-                (value > 0.4f && GetTileGradient(x, y, PerlinMap) > 0.15f))
+                (value > 0 && GetTileGradient(x, y, perlinMap) > 0.27f) ||
+                (value > 0.4f && GetTileGradient(x, y, perlinMap) > 0.15f))
             {
                 return new Tuple<byte, byte, byte>(
-                    (byte)(100),
-                    (byte)(100),
-                    (byte)(100)
+                    (byte)(75 + 25 * value),
+                    (byte)(75 + 25 * value),
+                    (byte)(75 + 25 * value)
                     );
             }
 
-            if (value < 0f) // from -1 to 0 so just add one ig
+            if (value < -0.2f) // from -1 to 0 so just add one ig
             {
                 return new Tuple<byte, byte, byte>(
                     (byte)(10 + (20 * (value + 1))),
                     (byte)(60 + (40 * (value + 1))),
                     (byte)(50 + (200 * (value + 1)))
+                    );
+            }
+            else if (value < 0f) // bright shore thingie
+            {
+                //return new Tuple<byte, byte, byte>(255, 255, 255);
+                return new Tuple<byte, byte, byte>(
+                    (byte)(28 + (10 * (value + 0.2f))),
+                    (byte)(96 + (500 * (value + 0.2f))),
+                    (byte)(230 + (100 * (value + 0.2f)))
                     );
             }
             else if (value < 0.1f)
@@ -315,14 +371,14 @@ namespace ShortTools.Perlin
                 {
                     return new Tuple<byte, byte, byte>(
                         (byte)(10 + value * 10),
-                        (byte)(100 + value * 50),
+                        (byte)(80 + value * 70),
                         (byte)(10 + value * 20)
                         );
                 }
                 else
                 {
                     return CheckForResources(x, y, value);
-                    
+
                 }
             }
         }
@@ -343,10 +399,99 @@ namespace ShortTools.Perlin
 
             return new Tuple<byte, byte, byte>(
                         (byte)(10 + value * 10),
-                        (byte)(150 + value * 50),
+                        (byte)(130 + value * 70),
                         (byte)(10 + value * 20)
                         );
         }
+
+
+
+        private static Tuple<byte, byte, byte> GetAbyssColours(int x, int y, float[,] perlinMap)
+        {
+            float value = perlinMap[x, y];
+
+            if (
+                (value > -0.65f && GetTileGradient(x, y, perlinMap) > 0.27f) ||
+                (value > 0.4f && GetTileGradient(x, y, perlinMap) > 0.15f))
+            {
+                return new Tuple<byte, byte, byte>(
+                    (byte)(60 + 20 * value),
+                    (byte)(50 + 20 * value),
+                    (byte)(70 + 20 * value)
+                    );
+            }
+
+            if (value < -0.9f) // from -1 to 0 so just add one ig Ocean
+            {
+                return new Tuple<byte, byte, byte>(
+                    (byte)(40 + (40 * (value + 1))),
+                    (byte)(20 + (20 * (value + 1))),
+                    (byte)(10 + (10 * (value + 1)))
+                    );
+            }
+            else if (value < -0.7f) // bright shore thingie
+            {
+                //return new Tuple<byte, byte, byte>(255, 255, 255);
+                return new Tuple<byte, byte, byte>(
+                    (byte)(44 + (50 * (value + 0.9f))),
+                    (byte)(22 + (10 * (value + 0.9f))),
+                    (byte)(11 + (5 * (value + 0.9f)))
+                    );
+            }
+            else if (value < -0.65f)
+            {
+                return new Tuple<byte, byte, byte>(50, 50, 30);
+            }
+            else
+            { // 0.1 to 1, thats 0.9 which is basically 0 - 1 : grass
+                if (treeMap?[x, y] > 0.1f)
+                {
+                    return new Tuple<byte, byte, byte>(
+                        (byte)(50 + value * 10),
+                        (byte)(40 + value * 20),
+                        (byte)(40 + value * 10)
+                        );
+                }
+                else
+                {
+                    return CheckForAbyssResources(x, y, value);
+                }
+            }
+        }
+
+
+        private static Tuple<byte, byte, byte> CheckForAbyssResources(int x, int y, float value)
+        {
+            foreach (ResourceMap resourceMap in resourceMaps)
+            {
+                float distance = MathF.Abs(x - (centre.Item1 / 2)) + MathF.Abs(y - (centre.Item2 / 2));
+                if (distance < resourceMap.minDist) { continue; }
+
+                if (resourceMap.map[x, y] > resourceMap.minValue) 
+                { 
+                    return new Tuple<byte, byte, byte>(
+                        (byte)((255 - resourceMap.colour.Item1) / 3f), 
+                        (byte)((255 - resourceMap.colour.Item2) / 3f),
+                        (byte)((255 - resourceMap.colour.Item3) / 3f)); 
+                }
+            }
+
+
+
+
+            return new Tuple<byte, byte, byte>(
+                        (byte)(40 + value * 20),
+                        (byte)(30 + value * 15),
+                        (byte)(60 + value * 40)
+                        );
+        }
+
+
+
+
+
+
+
 
 
 
